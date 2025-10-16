@@ -8,61 +8,6 @@ from transformers import EsmModel
 def modulate(x, shift, scale):
     return x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1)
 
-# class TimestepEmbedder(nn.Module):
-#     def __init__(self, hidden_size, frequency_embedding_size=256):
-#         super().__init__()
-#         self.mlp = nn.Sequential(
-#             nn.Linear(frequency_embedding_size, hidden_size),
-#             nn.SiLU(),
-#             nn.Linear(hidden_size, hidden_size),
-#         )
-#         self.frequency_embedding_size = frequency_embedding_size
-
-#     @staticmethod
-#     def timestep_embedding(t, dim, max_period=10000):
-#         half = dim // 2
-#         freqs = torch.exp(
-#             -math.log(max_period) * torch.arange(0, half, dtype=torch.float32, device=t.device) / half
-#         )
-#         args = t[:, None].float() * freqs[None]
-#         emb = torch.cat([torch.cos(args), torch.sin(args)], dim=-1)
-#         if dim % 2:
-#             emb = torch.cat([emb, torch.zeros_like(emb[:, :1])], dim=-1)
-#         return emb
-
-#     def forward(self, t_scalar):
-#         # t_scalar expected in [0, 1] (i.e., t/T)
-#         t_freq = self.timestep_embedding(t_scalar, self.frequency_embedding_size)
-#         return self.mlp(t_freq)
-
-# class LengthEmbedder(nn.Module):
-#     """Same parametrization as timestep MLP, used for target length L."""
-#     def __init__(self, hidden_size, frequency_embedding_size=128):
-#         super().__init__()
-#         self.mlp = nn.Sequential(
-#             nn.Linear(frequency_embedding_size, hidden_size),
-#             nn.SiLU(),
-#             nn.Linear(hidden_size, hidden_size),
-#         )
-#         self.frequency_embedding_size = frequency_embedding_size
-
-#     @staticmethod
-#     def sinusoidal(x, dim, max_period=10000):
-#         half = dim // 2
-#         freqs = torch.exp(
-#             -math.log(max_period) * torch.arange(0, half, dtype=torch.float32, device=x.device) / half
-#         )
-#         args = x[:, None].float() * freqs[None]
-#         emb = torch.cat([torch.cos(args), torch.sin(args)], dim=-1)
-#         if dim % 2:
-#             emb = torch.cat([emb, torch.zeros_like(emb[:, :1])], dim=-1)
-#         return emb
-
-#     def forward(self, L_scalar):
-#         # L can be raw length or normalized (e.g., L/L_max). Either way works consistently.
-#         e = self.sinusoidal(L_scalar, self.frequency_embedding_size)
-#         return self.mlp(e)
-
 class CondEmbedder(nn.Module):
     """
     Unified conditioning embedder for DiT that processes timestep and length together.
