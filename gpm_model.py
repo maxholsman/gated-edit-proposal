@@ -90,6 +90,8 @@ class RopeAttention(nn.Module):
         super().__init__()
         self.num_heads = num_heads
         self.head_dim = dim // num_heads
+        self.head_dim = dim // num_heads
+        assert self.head_dim % 2 == 0, "head_dim must be even for RoPE"
         assert dim % num_heads == 0, "hidden_size must be divisible by num_heads"
         self.scale = self.head_dim ** -0.5
 
@@ -235,12 +237,7 @@ class GatedProposalDiT(nn.Module):
                 nn.init.constant_(module.bias, 0)
 
     def forward(self, x_tokens, l, L_target, t, T, attn_mask=None):
-        """
-        x_tokens: (B, L, D_esm)
-        L_target: (B,) e.g., target length (int). You may pass raw value or normalized.
-        t: (B,) current step; T: int total steps
-        attn_mask: optional (B, 1, L, L) or (B, L) -> will be broadcast to attention
-        """
+        
         B, L = x_tokens.shape
         # print(f"x_tokens.shape: {x_tokens.shape}")
 
@@ -252,24 +249,19 @@ class GatedProposalDiT(nn.Module):
         # Conditioning vector c (B, D)
 
 
-        # Ensure t, T, l, and L_target are tensors of shape (B,)
-        if isinstance(t, int):
-            t = torch.full((B,), t)
-        if isinstance(T, int):
-            T = torch.full((B,), T)
-        if isinstance(l, int):
-            l = torch.full((B,), l)
-        if isinstance(L_target, int):
-            L_target = torch.full((B,), L_target)
-        
-        # INSERT_YOUR_CODE
-        # Check that t, T, l, and L_target have shape (B,)
-        for name, tensor in zip(['t', 'T', 'l', 'L_target'], [t, T, l, L_target]):
-            if not (isinstance(tensor, torch.Tensor) and tensor.shape == (B,)):
-                raise ValueError(f"{name} must be a torch.Tensor of shape ({B},), but got {type(tensor)} with shape {getattr(tensor, 'shape', None)}")
+        device = x.device
+        if isinstance(t, int): t = torch.full((B,), t, device=device)
+        if isinstance(T, int): T = torch.full((B,), T, device=device)
+        if isinstance(l, int): l = torch.full((B,), l, device=device)
+        if isinstance(L_target, int): L_target = torch.full((B,), L_target, device=device)
 
-        t_norm = t.float() / float(T)   # normalize to [0,1]
-        l_norm = l.float() / float(L_target)
+        # validate shapes & devices
+        for name, tensor in {'t': t, 'T': T, 'l': l, 'L_target': L_target}.items():
+            if not (isinstance(tensor, torch.Tensor) and tensor.shape == (B,) and tensor.device == device):
+                raise ValueError(f"{name} must be Tensor[{B}] on {device}, got {type(tensor)} {tuple(getattr(tensor,'shape',()))} on {getattr(tensor,'device',None)}")
+
+        t_norm = (t.float() / T.float()).clamp(0, 1)
+        l_norm = (l.float() / L_target.float()).clamp(0, 1)
         c = self.cond_embedder(t_norm, l_norm)
         
         # print(f"c.shape: {c.shape}")
